@@ -82,5 +82,6 @@ app.post "/build/:id/exit", (req, res) ->
   id = req.params.id
   writer.publish "build:#{id}:end", ""
   res.send "ok"
-
+  
+port = process.env.PORT
 app.start (port) -> console.log "listening on #{port}"

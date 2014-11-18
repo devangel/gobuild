@@ -13,11 +13,23 @@ root=$(cd $(dirname $0)/..; pwd)
 # if there's no vendored go, download an appropriate one
 if [[ ! -d $root/vendor/go ]]; then
   echo "Downloading go for $GOOS/$GOARCH"
-  goroot=$(mktemp -t goroot_XXXXX)
-  rm -rf $goroot
-  mkdir -p $goroot
+  goroot="/tmp/goroot_XXXXX.vtQB8ZQ2" #$(mktemp -t goroot_XXXXX)
+  #rm -rf $goroot
+  #mkdir -p $goroot
   cd $goroot
-  curl -s http://${COMPILER_BUCKET}.s3.amazonaws.com/go-${GOVERSION}-${GOOS}-${GOARCH}.tgz | tar -xzf -
+  #https://storage.googleapis.com/golang/go1.3.3.linux-amd64.tar.gz
+  #http://storage.googleapis.com/golang/go1.3.3.darwin-amd64.tar.gz
+  #https://storage.googleapis.com/golang/go1.3.3.linux-amd64.tar.gz
+  os="$((uname) | tr '[:upper:]' '[:lower:]')"
+
+  if [ $os = "darwin" ]
+  then
+    extraarch="-osx10.8"
+  else
+    extraarch=
+  fi
+  echo "Curling https://${COMPILER_BUCKET}/golang/go${GOVERSION}.${os}-${GOARCH}${extraarch}.tar.gz"
+  #curl -s https://${COMPILER_BUCKET}/golang/go${GOVERSION}.${os}-${GOARCH}${extraarch}.tar.gz | tar -xzf -
   export GOROOT="$goroot/go"
 else
   echo "Using vendored go"
@@ -26,9 +38,9 @@ fi
 
 # make a tempdir to build in
 echo "Creating GOPATH"
-gopath=$(mktemp -t gopath_XXXXX)
-rm -rf $gopath
-mkdir -p $gopath
+gopath="/tmp/gopath_XXXXX.YAxyOn3i" # $(mktemp -t gopath_XXXXX)
+#rm -rf $gopath
+#mkdir -p $gopath
 
 # some vars for go
 export GOPATH="$gopath"
@@ -53,7 +65,7 @@ if [[ "$KEY" != "" && "$SPAWN_ENV" != "local" ]]; then
 else
 
   echo "Downloading $PROJECT"
-  go get -d $PROJECT >/tmp/build.log
+  #go get -d $PROJECT >/tmp/build.log
 
 fi
 
@@ -66,14 +78,15 @@ if [[ ! -z $REF ]]; then
 fi
 
 # set up godeps
-if [ -f Godeps ]; then
+#if [ -f Godeps ]; then
   echo "Installing godep"
   env GOARCH= GOOS= go get github.com/tools/godep
   export PATH="$GOPATH/bin:$PATH"
-fi
+#fi
 
-echo "Compiling"
-make VERSION=$VERSION
+echo "Compiling to echo $GOPATH/bin/$(echo $PROJECT | cut -d/ -f3)"
+#make VERSION=$VERSION
+godep go build -o "$GOPATH/bin/$(echo $PROJECT | cut -d/ -f3)"
 
 if [ -d $GOPATH/bin/${GOOS}_${GOARCH} ]; then
   BINARY="$(ls -1 $GOPATH/bin/${GOOS}_${GOARCH}/$(echo $PROJECT | cut -d/ -f3)*)"
@@ -83,6 +96,8 @@ fi
 
 echo "Recording size"
 SIZE=$(wc -c <$BINARY | tr -d ' ')
+echo "Size is $SIZE"
+echo "Posting Size to $BUILD_HOST/build/$BUILD_ID/size"
 curl -s -X POST $BUILD_HOST/build/$BUILD_ID/size -d size=$SIZE >/dev/null
 
 echo "Uploading binary"
